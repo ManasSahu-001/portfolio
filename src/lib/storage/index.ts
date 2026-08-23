@@ -64,10 +64,12 @@ let store: ContentStore | null = null;
 
 export function getStore(): ContentStore {
   if (!store) {
-    const connectionString = process.env.DATABASE_URL;
-    store = connectionString
-      ? createPostgresStore(connectionString)
-      : new FileStore();
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl) {
+      store = createPostgresStore(databaseUrl);
+    } else {
+      store = new FileStore();
+    }
   }
   return store;
 }
