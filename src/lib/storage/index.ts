@@ -2,14 +2,16 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { seedData } from "./seed";
+import { migrate } from "./migrate";
+import { createPostgresStore } from "./postgres";
 import type { DBData } from "@/types";
 
 /**
  * Storage layer.
  *
  * Default driver: JSON file store (no database required).
- * The interface below is intentionally narrow so a PostgreSQL driver
- * can replace it later without touching callers.
+ * Set DATABASE_URL to use PostgreSQL instead — required for
+ * production deployments where the filesystem is ephemeral.
  */
 
 export interface ContentStore {
@@ -58,25 +60,15 @@ class FileStore implements ContentStore {
   }
 }
 
-function migrate(data: DBData): DBData {
-  const seeded = seedData();
-  return {
-    profile: { ...seeded.profile, ...data.profile },
-    socials: { ...seeded.socials, ...data.socials, others: data.socials?.others ?? [] },
-    competitive: { ...seeded.competitive, ...data.competitive },
-    skills: data.skills ?? seeded.skills,
-    achievements: data.achievements ?? [],
-    communities: data.communities ?? seeded.communities,
-    projects: data.projects ?? seeded.projects,
-    knowledgeDocs: data.knowledgeDocs ?? [],
-    syncMeta: data.syncMeta ?? { lastSync: null, docCount: 0 },
-  };
-}
-
 let store: ContentStore | null = null;
 
 export function getStore(): ContentStore {
-  if (!store) store = new FileStore();
+  if (!store) {
+    const connectionString = process.env.DATABASE_URL;
+    store = connectionString
+      ? createPostgresStore(connectionString)
+      : new FileStore();
+  }
   return store;
 }
 
